@@ -1,5 +1,13 @@
 package com.dio.devinperformer.android.ui.screens.products
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,7 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,11 +40,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -87,12 +100,23 @@ fun ProductListScreen(
                 color = AppColors.TextPrimary
             )
 
+            // Animated Cart Badge
+            val badgeScale by animateFloatAsState(
+                targetValue = if (cartState.itemCount > 0) 1f else 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                ),
+                label = "badgeScale"
+            )
+
             BadgedBox(
                 badge = {
                     if (cartState.itemCount > 0) {
                         Badge(
                             containerColor = AppColors.GradientStart,
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            modifier = Modifier.scale(badgeScale)
                         ) {
                             Text(cartState.itemCount.toString())
                         }
@@ -128,7 +152,6 @@ fun ProductListScreen(
                 CategoryChip(
                     label = "Todos",
                     isSelected = uiState.selectedCategory == null,
-                    gradientBrush = gradientBrush,
                     onClick = { viewModel.selectCategory(null) }
                 )
             }
@@ -136,7 +159,6 @@ fun ProductListScreen(
                 CategoryChip(
                     label = category.replaceFirstChar { it.uppercase() },
                     isSelected = uiState.selectedCategory == category,
-                    gradientBrush = gradientBrush,
                     onClick = { viewModel.selectCategory(category) }
                 )
             }
@@ -183,11 +205,27 @@ fun ProductListScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(filteredProducts) { product ->
-                        ProductCard(
-                            product = product,
-                            onClick = { onProductClick(product.id) }
-                        )
+                    itemsIndexed(filteredProducts) { index, product ->
+                        // Staggered fade-in + slide animation
+                        var visible by remember { mutableStateOf(false) }
+                        LaunchedEffect(product.id) {
+                            kotlinx.coroutines.delay(index * 50L)
+                            visible = true
+                        }
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = fadeIn(
+                                animationSpec = tween(durationMillis = 400)
+                            ) + slideInVertically(
+                                initialOffsetY = { it / 2 },
+                                animationSpec = tween(durationMillis = 400)
+                            )
+                        ) {
+                            ProductCard(
+                                product = product,
+                                onClick = { onProductClick(product.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -199,28 +237,49 @@ fun ProductListScreen(
 fun CategoryChip(
     label: String,
     isSelected: Boolean,
-    gradientBrush: Brush,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(20.dp)
+
+    // Animated background color transition
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) AppColors.GradientStart else AppColors.CardBackground,
+        animationSpec = tween(durationMillis = 300),
+        label = "chipBgColor"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) Color.White else AppColors.TextSecondary,
+        animationSpec = tween(durationMillis = 300),
+        label = "chipTextColor"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) AppColors.GradientEnd else AppColors.GradientStart.copy(alpha = 0.5f),
+        animationSpec = tween(durationMillis = 300),
+        label = "chipBorderColor"
+    )
+
+    // Scale animation on selection
+    val chipScale by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "chipScale"
+    )
+
     Box(
         modifier = Modifier
+            .scale(chipScale)
             .clip(shape)
-            .then(
-                if (isSelected) {
-                    Modifier.background(gradientBrush, shape)
-                } else {
-                    Modifier
-                        .background(AppColors.CardBackground, shape)
-                        .border(1.dp, AppColors.GradientStart.copy(alpha = 0.5f), shape)
-                }
-            )
+            .background(backgroundColor, shape)
+            .border(1.dp, borderColor, shape)
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(
             text = label,
-            color = if (isSelected) Color.White else AppColors.TextSecondary,
+            color = textColor,
             fontSize = 14.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )

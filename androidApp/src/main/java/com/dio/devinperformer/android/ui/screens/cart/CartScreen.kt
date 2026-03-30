@@ -1,11 +1,14 @@
 package com.dio.devinperformer.android.ui.screens.cart
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,10 +26,15 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,6 +55,7 @@ import com.dio.devinperformer.android.ui.components.GradientButton
 import com.dio.devinperformer.android.ui.theme.AppColors
 import com.dio.devinperformer.android.viewmodel.CartViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(
     onBackClick: () -> Unit,
@@ -122,33 +131,77 @@ fun CartScreen(
                 }
             }
         } else {
-            // Cart items list
+            // Cart items list with swipe-to-delete
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                contentPadding = PaddingValues(
                     horizontal = 16.dp,
                     vertical = 8.dp
                 )
             ) {
-                items(uiState.items) { cartItem ->
-                    CartItemCard(
-                        cartItem = cartItem,
-                        gradientColors = gradientColors,
-                        onRemove = { viewModel.removeFromCart(cartItem.product.id) },
-                        onIncrement = {
-                            viewModel.updateQuantity(
-                                cartItem.product.id,
-                                cartItem.quantity + 1
-                            )
-                        },
-                        onDecrement = {
-                            viewModel.updateQuantity(
-                                cartItem.product.id,
-                                cartItem.quantity - 1
-                            )
+                items(
+                    items = uiState.items,
+                    key = { it.product.id }
+                ) { cartItem ->
+                    val dismissState = rememberSwipeToDismissBoxState()
+
+                    // Trigger removal when swiped
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                            viewModel.removeFromCart(cartItem.product.id)
                         }
-                    )
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        enableDismissFromEndToStart = true,
+                        backgroundContent = {
+                            // Red delete background revealed on swipe
+                            val bgColor by animateColorAsState(
+                                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) {
+                                    AppColors.Error
+                                } else {
+                                    Color.Transparent
+                                },
+                                animationSpec = tween(200),
+                                label = "swipeBg"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(bgColor, RoundedCornerShape(12.dp))
+                                    .padding(end = 20.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Deletar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+                    ) {
+                        CartItemCard(
+                            cartItem = cartItem,
+                            gradientColors = gradientColors,
+                            onRemove = { viewModel.removeFromCart(cartItem.product.id) },
+                            onIncrement = {
+                                viewModel.updateQuantity(
+                                    cartItem.product.id,
+                                    cartItem.quantity + 1
+                                )
+                            },
+                            onDecrement = {
+                                viewModel.updateQuantity(
+                                    cartItem.product.id,
+                                    cartItem.quantity - 1
+                                )
+                            }
+                        )
+                    }
                 }
             }
 

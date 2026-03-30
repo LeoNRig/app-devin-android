@@ -1,7 +1,16 @@
 package com.dio.devinperformer.android.ui.screens.productdetail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -261,11 +270,24 @@ fun ProductDetailScreen(
             }
         }
 
-        // Snackbar for cart feedback
-        if (uiState.addedToCart) {
+        // Animated Snackbar slide-in from bottom
+        AnimatedVisibility(
+            visible = uiState.addedToCart,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            ) + fadeIn(),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(300)
+            ) + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
             Snackbar(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .padding(16.dp),
                 containerColor = AppColors.GradientStart,
                 contentColor = Color.White,
@@ -276,12 +298,15 @@ fun ProductDetailScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
                             .padding(end = 8.dp)
+                            .clickable { onCartClick() }
                     )
                 }
             ) {
                 Text("Produto adicionado ao carrinho!")
             }
-            LaunchedEffect(uiState.addedToCart) {
+        }
+        if (uiState.addedToCart) {
+            LaunchedEffect(Unit) {
                 kotlinx.coroutines.delay(2000)
                 viewModel.resetCartStatus()
             }
